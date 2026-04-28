@@ -1,6 +1,6 @@
 # Backyard Esports Launcher
 
-[![Build](https://github.com/backyard-esports/byes-launcher/actions/workflows/build.yml/badge.svg)](https://github.com/backyard-esports/byes-launcher/actions/workflows/build.yml)
+[![Build](https://github.com/Fallen-Donkey/Arma2Launcher/actions/workflows/build.yml/badge.svg)](https://github.com/Fallen-Donkey/Arma2Launcher/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A community launcher for **Arma 2 Operation Arrowhead** and **DayZ
@@ -53,8 +53,8 @@ just the launcher.
 Requirements: **.NET 8 SDK** on Windows.
 
 ```powershell
-git clone https://github.com/backyard-esports/byes-launcher.git
-cd byes-launcher
+git clone https://github.com/Fallen-Donkey/Arma2Launcher.git
+cd Arma2Launcher
 dotnet run --project src/ByesLauncher
 ```
 
