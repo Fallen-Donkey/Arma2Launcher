@@ -1,0 +1,46 @@
+name: Bug report
+description: Something doesn't work
+labels: ["bug"]
+body:
+  - type: input
+    id: launcher_version
+    attributes:
+      label: Launcher version
+      description: Visible in the title bar / Settings tab.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scenario
+    attributes:
+      label: When does it happen?
+      options:
+        - Joining a server
+        - Syncing a modpack
+        - Browsing the server list
+        - Profile management
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: One paragraph. What did you try, what did you expect, what did the launcher actually do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message (if any)
+      description: Copy-paste from the launcher status bar or any popup. Logs at `%APPDATA%\ByesLauncher\` are also helpful.
+      render: shell
+
+  - type: input
+    id: server
+    attributes:
+      label: Server you were trying to join (if relevant)
+      placeholder: "byes.nz | Epoch — 203.0.113.5:2302"

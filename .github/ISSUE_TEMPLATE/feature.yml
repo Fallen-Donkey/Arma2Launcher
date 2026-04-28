@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest something the launcher should do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What player problem does this solve?
+      description: Start with the player pain point, not the implementation. "I can't tell at a glance which servers are wiped" is more useful than "add a wipe-date column."
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea (optional)
+      description: How you'd like it to work. Skip if you just want to flag the problem.
+
+  - type: textarea
+    id: existing
+    attributes:
+      label: How do other launchers handle this?
+      description: If DZSA Launcher, Maca134, ArmA3Sync, or DayZCommander does this, link to a screenshot or describe how. Saves us reinventing the wheel.

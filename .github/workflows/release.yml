@@ -1,0 +1,95 @@
+name: Release
+
+# Triggers on a pushed tag matching `v*` (e.g. `v0.1.1`). Builds the launcher,
+# packs a Velopack release, and attaches the artifacts to a GitHub Release.
+#
+# Once SignPath OSS approval lands, the signing step (currently commented out)
+# gets enabled and every artifact is signed before upload — eliminating the
+# SmartScreen warning for end users.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write    # required to create the GitHub Release
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # full history so vpk can compute deltas
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Resolve version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $ver = $tag -replace '^v',''
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "Building v$ver"
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk
+
+      - name: Publish (self-contained)
+        run: dotnet publish src/ByesLauncher/ByesLauncher.csproj -c Release -r win-x64 --self-contained -o dist/publish
+
+      # ---------------------------------------------------------------
+      # SignPath signing — uncomment AFTER SignPath OSS approval lands.
+      # Set SIGNPATH_API_TOKEN as a repo secret first.
+      # ---------------------------------------------------------------
+      # - name: Submit to SignPath for signing
+      #   uses: signpath/github-action-submit-signing-request@v1
+      #   with:
+      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #     organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+      #     project-slug: byes-launcher
+      #     signing-policy-slug: release-signing
+      #     artifact-configuration-slug: byes-launcher
+      #     github-artifact-name: byes-launcher-publish
+      #     wait-for-completion: true
+      #     output-artifact-directory: dist/publish
+
+      - name: Pack Velopack release
+        run: |
+          vpk pack `
+            -u ByesLauncher `
+            -v ${{ steps.version.outputs.version }} `
+            -p dist/publish `
+            -e ByesLauncher.exe `
+            -o dist/releases `
+            --packTitle "Backyard Esports Launcher" `
+            --packAuthors "Backyard Esports"
+
+      - name: Create GitHub Release with artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: BYES Launcher ${{ steps.version.outputs.version }}
+          body: |
+            Automated release. See `dist/releases/` artifacts attached below.
+
+            **For players:** download `ByesLauncher-win-Setup.exe`. If you
+            already have the launcher installed, it will auto-update on next
+            startup — no need to re-download.
+
+            **For maintainers:** SCP the entire artifact set to
+            `byes.nz:/home/ubuntu/launcher-releases/updates/` to push this
+            release out to existing installations.
+          files: |
+            dist/releases/ByesLauncher-win-Setup.exe
+            dist/releases/ByesLauncher-win-Portable.zip
+            dist/releases/ByesLauncher-${{ steps.version.outputs.version }}-full.nupkg
+            dist/releases/RELEASES
+            dist/releases/releases.win.json
+            dist/releases/assets.win.json
+          fail_on_unmatched_files: true
