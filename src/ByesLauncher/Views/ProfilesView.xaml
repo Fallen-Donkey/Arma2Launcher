@@ -1,0 +1,35 @@
+<UserControl x:Class="ByesLauncher.Views.ProfilesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <DockPanel Grid.Column="0" Margin="0,0,8,0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBox Text="{Binding NewProfileName, UpdateSourceTrigger=PropertyChanged}" Width="170"/>
+                <ui:Button Content="Create" Command="{Binding CreateCommand}" Margin="8,0,0,0"/>
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                <ui:Button Content="Refresh" Command="{Binding RefreshCommand}"/>
+                <ui:Button Content="Delete" Appearance="Danger" Command="{Binding DeleteCommand}" Margin="8,0,0,0"/>
+            </StackPanel>
+            <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" DisplayMemberPath="Name"/>
+        </DockPanel>
+
+        <GroupBox Grid.Column="1" Header="Enabled mods for this profile">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding AvailableMods}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Content="{Binding Name}" IsChecked="{Binding Enabled}" Margin="4"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </GroupBox>
+    </Grid>
+</UserControl>

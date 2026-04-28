@@ -1,0 +1,38 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Python (manifest_gen.py is shipped, but caches aren't)
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+## Velopack build output — releases are uploaded to GitHub Releases, not committed
+dist/
+
+## Private deployment handoff docs — operational details that don't belong in the public repo
+WEBSITE_HANDOFF.md
+LAUNCHER_DEPLOY_HANDOFF.md
+OSS_HANDOFF.md
+
+## Local screenshots (kept for development, not for the public repo)
+preview*.png
+
+## Local Velopack signing config (real one is provided by SignPath, never committed)
+signing.config.json
+
+## Secrets — extra paranoia, none should live in repo anyway
+*.pem
+*.pfx
+.env
+.env.*
+!.env.example
+
+## OS
+Thumbs.db
+.DS_Store

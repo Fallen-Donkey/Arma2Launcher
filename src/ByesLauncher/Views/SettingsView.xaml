@@ -1,0 +1,130 @@
+<UserControl x:Class="ByesLauncher.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+        <StackPanel MaxWidth="900" HorizontalAlignment="Left">
+
+            <!-- Paths -->
+            <ui:CardExpander IsExpanded="True" Margin="0,0,0,12">
+                <ui:CardExpander.Header>
+                    <TextBlock Text="Game paths" FontWeight="SemiBold" FontSize="14"/>
+                </ui:CardExpander.Header>
+                <StackPanel>
+                    <TextBlock Text="Arma 2 Operation Arrowhead folder" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                    <DockPanel Margin="0,0,0,12">
+                        <ui:Button DockPanel.Dock="Right" Content="Browse…" Command="{Binding BrowseArmaPathCommand}" Margin="8,0,0,0"/>
+                        <ui:TextBox Text="{Binding Arma2OaPath, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="C:\...\Arma 2 Operation Arrowhead"/>
+                    </DockPanel>
+
+                    <TextBlock Text="DayZ Standalone folder" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                    <DockPanel Margin="0,0,0,12">
+                        <ui:Button DockPanel.Dock="Right" Content="Browse…" Command="{Binding BrowseDayZPathCommand}" Margin="8,0,0,0"/>
+                        <ui:TextBox Text="{Binding DayZStandalonePath, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="C:\...\DayZ"/>
+                    </DockPanel>
+
+                    <TextBlock Text="Backend URL" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                    <ui:TextBox Text="{Binding BackendUrl, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </ui:CardExpander>
+
+            <!-- Launch options -->
+            <ui:CardExpander IsExpanded="True" Margin="0,0,0,12">
+                <ui:CardExpander.Header>
+                    <TextBlock Text="Launch options" FontWeight="SemiBold" FontSize="14"/>
+                </ui:CardExpander.Header>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <CheckBox Content="Use BattlEye (arma2oa_be.exe)" IsChecked="{Binding UseBattleEye}" Margin="0,4"/>
+                        <CheckBox Content="-nosplash    Skip the BI splash videos" IsChecked="{Binding NoSplash}" Margin="0,4"/>
+                        <CheckBox Content="-skipIntro    Skip the main-menu intro" IsChecked="{Binding SkipIntro}" Margin="0,4"/>
+                        <CheckBox Content="-world=empty  Don't preload Chernarus on menu" IsChecked="{Binding WorldEmpty}" Margin="0,4"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <CheckBox Content="-noPause      Keep simulation running when alt-tabbed" IsChecked="{Binding NoPause}" Margin="0,4"/>
+                        <CheckBox Content="-showScriptErrors" IsChecked="{Binding ShowScriptErrors}" Margin="0,4"/>
+                        <CheckBox Content="-filePatching (allow loose unpacked files)" IsChecked="{Binding FilePatching}" Margin="0,4"/>
+                        <CheckBox Content="-window       Run windowed instead of fullscreen" IsChecked="{Binding Windowed}" Margin="0,4"/>
+                    </StackPanel>
+                </Grid>
+            </ui:CardExpander>
+
+            <!-- Performance -->
+            <ui:CardExpander IsExpanded="True" Margin="0,0,0,12">
+                <ui:CardExpander.Header>
+                    <TextBlock Text="Performance tuning" FontWeight="SemiBold" FontSize="14"/>
+                </ui:CardExpander.Header>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="-maxMem (MB)"  Grid.Row="0" Grid.Column="0" Margin="0,8,8,8" VerticalAlignment="Center"/>
+                    <ui:TextBox Text="{Binding MaxMem, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="2047"
+                                Grid.Row="0" Grid.Column="1" Margin="0,4"/>
+                    <TextBlock Text="-cpuCount" Grid.Row="0" Grid.Column="3" Margin="16,8,8,8" VerticalAlignment="Center"/>
+                    <ui:TextBox Text="{Binding CpuCount, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="auto"
+                                Grid.Row="0" Grid.Column="4" Margin="0,4"/>
+
+                    <TextBlock Text="-exThreads" Grid.Row="1" Grid.Column="0" Margin="0,8,8,8" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding ExThreadsOptions}" SelectedItem="{Binding ExThreads}"
+                              Grid.Row="1" Grid.Column="1" Margin="0,4"/>
+                    <TextBlock Text="-malloc" Grid.Row="1" Grid.Column="3" Margin="16,8,8,8" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding MallocOptions}" SelectedItem="{Binding Malloc}"
+                              Grid.Row="1" Grid.Column="4" Margin="0,4"/>
+
+                    <CheckBox Content="-enableHT (use logical cores)" IsChecked="{Binding EnableHT}"
+                              Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5" Margin="0,8"/>
+                </Grid>
+            </ui:CardExpander>
+
+            <!-- Custom args -->
+            <ui:CardExpander Margin="0,0,0,12">
+                <ui:CardExpander.Header>
+                    <TextBlock Text="Custom command-line arguments" FontWeight="SemiBold" FontSize="14"/>
+                </ui:CardExpander.Header>
+                <StackPanel>
+                    <TextBlock Text="Anything in this box is appended to the launch command verbatim. Space-separated."
+                               Opacity="0.7" Margin="0,0,0,6"/>
+                    <ui:TextBox Text="{Binding CustomArgs, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="-mod=@MyExtraMod -beta=Expansion ..."
+                                AcceptsReturn="False"/>
+                </StackPanel>
+            </ui:CardExpander>
+
+            <!-- Downloads -->
+            <ui:CardExpander Margin="0,0,0,12">
+                <ui:CardExpander.Header>
+                    <TextBlock Text="Downloads" FontWeight="SemiBold" FontSize="14"/>
+                </ui:CardExpander.Header>
+                <StackPanel>
+                    <TextBlock Text="Max parallel downloads" Margin="0,0,0,4"/>
+                    <ui:TextBox Text="{Binding MaxParallelDownloads, UpdateSourceTrigger=PropertyChanged}"
+                                Width="100" HorizontalAlignment="Left"/>
+                </StackPanel>
+            </ui:CardExpander>
+
+            <!-- Save row -->
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <ui:Button Content="Save Settings" Appearance="Primary" Command="{Binding SaveCommand}"
+                           Icon="{ui:SymbolIcon Save24}"/>
+                <ui:Button Content="Reset launch defaults" Command="{Binding ResetDefaultsCommand}" Margin="8,0,0,0"/>
+                <TextBlock Text="{Binding SaveStatus}" VerticalAlignment="Center" Margin="12,0" Foreground="#74E08A"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
