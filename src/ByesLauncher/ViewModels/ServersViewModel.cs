@@ -15,7 +15,6 @@ namespace ByesLauncher.ViewModels;
 public partial class ServersViewModel : ObservableObject
 {
     private readonly BackendClient _backend;
-    private readonly SteamMasterQuery _master;
     private readonly A2sQuery _a2s;
     private readonly ModpackJoinCoordinator _joiner;
     private readonly FavoritesService _favorites;
@@ -23,7 +22,7 @@ public partial class ServersViewModel : ObservableObject
 
     [ObservableProperty] private ObservableCollection<ServerInfo> servers = new();
     [ObservableProperty] private ServerInfo? selected;
-    [ObservableProperty] private string filter = "dayz";
+    [ObservableProperty] private string filter = "";
     [ObservableProperty] private bool hideEmpty;
     [ObservableProperty] private bool hideFull;
     [ObservableProperty] private bool hidePassworded;
@@ -40,19 +39,41 @@ public partial class ServersViewModel : ObservableObject
 
     public ICollectionView ServersView { get; }
 
-    public ServersViewModel(BackendClient backend, SteamMasterQuery master, A2sQuery a2s,
+    /// Forwarded from the singleton join coordinator. Lets the Join button
+    /// flip its label/IsEnabled while a launch is in progress on any tab.
+    public bool IsJoining => _joiner.IsJoining;
+
+    /// UTC timestamp of the last successful (or attempted) refresh. Drives
+    /// the tab-activate stale-check — we don't want to spam the backend
+    /// every time the user clicks a tab, only if the data is actually
+    /// likely to be stale.
+    public DateTime LastRefreshUtc { get; private set; } = DateTime.MinValue;
+
+    public ServersViewModel(BackendClient backend, A2sQuery a2s,
                             ModpackJoinCoordinator joiner, FavoritesService favorites,
                             ModpackMatcher matcher)
     {
         _backend = backend;
-        _master = master;
         _a2s = a2s;
         _joiner = joiner;
         _favorites = favorites;
         _matcher = matcher;
 
+        _joiner.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ModpackJoinCoordinator.IsJoining))
+                OnPropertyChanged(nameof(IsJoining));
+        };
+
         ServersView = CollectionViewSource.GetDefaultView(Servers);
-        ServersView.SortDescriptions.Add(new SortDescription(nameof(ServerInfo.IsByes), ListSortDirection.Descending));
+        // Sort tiers, top → bottom of the list:
+        //   1. IsByes desc      — BYES-curated servers always pinned at top
+        //   2. HasPing desc     — measured servers above unmeasured ("—") ones
+        //   3. Ping asc         — lowest ping first within measured group
+        //   4. Players desc     — more-populated wins as the unmeasured tiebreaker
+        ServersView.SortDescriptions.Add(new SortDescription(nameof(ServerInfo.IsByes),  ListSortDirection.Descending));
+        ServersView.SortDescriptions.Add(new SortDescription(nameof(ServerInfo.HasPing), ListSortDirection.Descending));
+        ServersView.SortDescriptions.Add(new SortDescription(nameof(ServerInfo.Ping),    ListSortDirection.Ascending));
         ServersView.SortDescriptions.Add(new SortDescription(nameof(ServerInfo.Players), ListSortDirection.Descending));
         ServersView.Filter = ServerFilter;
     }
@@ -66,6 +87,26 @@ public partial class ServersViewModel : ObservableObject
     partial void OnBattleEyeOnlyChanged(bool value) => ServersView.Refresh();
     partial void OnMapFilterChanged(string value) => ServersView.Refresh();
     partial void OnModFilterChanged(string value) => ServersView.Refresh();
+
+    /// When the user clicks an unmeasured server, kick off a fresh probe
+    /// across all three port candidates with a generous 6s timeout. Often
+    /// resolves the "why is this row stuck on —" question without a manual
+    /// refresh.
+    partial void OnSelectedChanged(ServerInfo? value)
+    {
+        if (value == null || value.Ping > 0) return;
+        var target = value;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var info = await TryThreePortsAsync(target.Endpoint, timeoutMs: 6000);
+                if (info != null && info.Ping > 0)
+                    Application.Current.Dispatcher.Invoke(() => target.Ping = info.Ping);
+            }
+            catch { /* swallow — same server can be retried by the user clicking refresh */ }
+        });
+    }
 
     private bool ServerFilter(object obj)
     {
@@ -103,6 +144,14 @@ public partial class ServersViewModel : ObservableObject
 
     private void RebuildFilterDropdowns()
     {
+        // Preserve user's current dropdown selections across the rebuild.
+        // Clearing the ObservableCollection makes the bound ComboBox drop its
+        // SelectedItem (the old reference is gone), which the user reads as
+        // "Refresh All cleared my filters". We restore the value if the new
+        // server set still contains it.
+        var prevMap = MapFilter;
+        var prevMod = ModFilter;
+
         var maps = Servers.Where(s => !string.IsNullOrWhiteSpace(s.Map))
                           .Select(s => s.Map)
                           .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -117,6 +166,133 @@ public partial class ServersViewModel : ObservableObject
         AvailableMods.Add("");
         foreach (var m in maps) AvailableMaps.Add(m);
         foreach (var m in mods) AvailableMods.Add(m);
+
+        // Restore the previous selection if it survived the rebuild. If a
+        // map/mod the user was filtering on disappears between refreshes
+        // (server went offline), fall back to the empty "show all" entry
+        // rather than leaving the ComboBox in an inconsistent state.
+        MapFilter = AvailableMaps.Contains(prevMap, StringComparer.OrdinalIgnoreCase) ? prevMap : "";
+        ModFilter = AvailableMods.Contains(prevMod, StringComparer.OrdinalIgnoreCase) ? prevMod : "";
+    }
+
+    /// Background A2S sweep — probes each server's query port for real ping
+    /// and updates ServerInfo.Ping in place. Two-pass strategy:
+    ///
+    ///  1. **Fast pass** (parallelism 192, 2.5s timeout) — covers the bulk of
+    ///     responsive servers in 5–10 seconds. Most measurements land here.
+    ///  2. **Slow retry pass** (parallelism 48, 5s timeout) — only the ones
+    ///     the fast pass missed. Catches servers under heavy player load
+    ///     that drop the first request.
+    ///  3. **ICMP fallback** for servers still unmeasured — many shared
+    ///     hosts block A2S but allow ICMP. Not as accurate (route latency,
+    ///     not application response) but useful as a "host is reachable"
+    ///     signal vs. "—".
+    ///
+    /// Servers that fail all three will keep `Ping = 0` and render as "—",
+    /// which is the truthful answer: we tried, they didn't answer.
+    private async Task EnrichPingsAsync(List<ServerInfo> servers)
+    {
+        await ProbePassAsync(servers, parallelism: 192, timeoutMs: 2500, label: "fast pass");
+        // Re-run the sort after each pass so newly-measured servers visually
+        // settle above the unmeasured "—" rows. ICollectionView doesn't
+        // auto-resort on item-property changes — only on add/remove/replace.
+        Application.Current.Dispatcher.Invoke(() => ServersView.Refresh());
+
+        var stillUnmeasured = servers.Where(s => s.Ping == 0).ToList();
+        if (stillUnmeasured.Count > 0)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+                Status = $"{Servers.Count} servers loaded · retrying {stillUnmeasured.Count} slow servers…");
+            await ProbePassAsync(stillUnmeasured, parallelism: 48, timeoutMs: 5000, label: "retry pass");
+            Application.Current.Dispatcher.Invoke(() => ServersView.Refresh());
+        }
+
+        var icmpCandidates = servers.Where(s => s.Ping == 0).ToList();
+        if (icmpCandidates.Count > 0)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+                Status = $"{Servers.Count} servers loaded · ICMP probing {icmpCandidates.Count} A2S-blocked hosts…");
+            await IcmpProbePassAsync(icmpCandidates);
+            Application.Current.Dispatcher.Invoke(() => ServersView.Refresh());
+        }
+
+        var measured = servers.Count(s => s.Ping > 0);
+        Application.Current.Dispatcher.Invoke(() =>
+            Status = $"{Servers.Count} servers loaded · {measured}/{servers.Count} pings measured.");
+    }
+
+    private async Task ProbePassAsync(IReadOnlyList<ServerInfo> servers, int parallelism, int timeoutMs, string label)
+    {
+        var sem = new SemaphoreSlim(parallelism);
+        var tasks = servers.Select(async s =>
+        {
+            await sem.WaitAsync();
+            try
+            {
+                var info = await TryThreePortsAsync(s.Endpoint, timeoutMs);
+                if (info != null && info.Ping > 0)
+                    Application.Current.Dispatcher.Invoke(() => s.Ping = info.Ping);
+            }
+            catch { /* skip individual failures */ }
+            finally { sem.Release(); }
+        }).ToArray();
+        await Task.WhenAll(tasks);
+    }
+
+    /// Most Arma 2 OA servers respond on `gamePort+1` — but a non-trivial
+    /// minority follow Arma-3 style (gamePort itself) or ship hosting where
+    /// the query socket is at `gamePort+2`. Maca's launcher gets ping for
+    /// these by trying multiple candidates; we do the same. First successful
+    /// reply wins. Stops after the first hit so we don't waste UDP traffic.
+    private async Task<ServerInfo?> TryThreePortsAsync(ServerEndpoint baseEp, int timeoutMs)
+    {
+        // 1. Standard A2 OA convention (queryPort = baseEp.QueryPort, which
+        //    is either the explicit value from discovery or gamePort+1).
+        var info = await _a2s.QueryAsync(baseEp, timeoutMs);
+        if (info != null) return info;
+
+        // 2. Game port itself — covers Arma 3-style configs.
+        if (baseEp.QueryPort != baseEp.GamePort)
+        {
+            var altGp = new ServerEndpoint(baseEp.Address, baseEp.GamePort, baseEp.GamePort);
+            info = await _a2s.QueryAsync(altGp, timeoutMs);
+            if (info != null) return info;
+        }
+
+        // 3. gamePort + 2 — some shared hosts use a non-default offset.
+        var plus2 = (ushort)Math.Min(65535, baseEp.GamePort + 2);
+        if (plus2 != baseEp.QueryPort && plus2 != baseEp.GamePort)
+        {
+            var altP2 = new ServerEndpoint(baseEp.Address, baseEp.GamePort, plus2);
+            info = await _a2s.QueryAsync(altP2, timeoutMs);
+            if (info != null) return info;
+        }
+
+        return null;
+    }
+
+    /// ICMP pings the host IP. Last-resort fallback when A2S is firewalled
+    /// off. RoundtripTime is host-level latency, not application response —
+    /// flag in the UI? For now we just use it as a "you can probably reach
+    /// this server" signal; if it's wildly different from real A2S latency,
+    /// users will figure it out from the playing experience.
+    private async Task IcmpProbePassAsync(IReadOnlyList<ServerInfo> servers)
+    {
+        var sem = new SemaphoreSlim(64);
+        var tasks = servers.Select(async s =>
+        {
+            await sem.WaitAsync();
+            try
+            {
+                using var pinger = new System.Net.NetworkInformation.Ping();
+                var reply = await pinger.SendPingAsync(s.Endpoint.Address, 2500);
+                if (reply.Status == System.Net.NetworkInformation.IPStatus.Success && reply.RoundtripTime > 0)
+                    Application.Current.Dispatcher.Invoke(() => s.Ping = (int)reply.RoundtripTime);
+            }
+            catch { /* ICMP commonly blocked too — give up cleanly */ }
+            finally { sem.Release(); }
+        }).ToArray();
+        await Task.WhenAll(tasks);
     }
 
     [RelayCommand]
@@ -138,7 +314,7 @@ public partial class ServersViewModel : ObservableObject
     private async Task RefreshAsync()
     {
         IsLoading = true;
-        Status = "Loading BYES servers...";
+        Status = "Loading...";
         Servers.Clear();
         try
         {
@@ -148,53 +324,108 @@ public partial class ServersViewModel : ObservableObject
                 var modpacks = await _backend.GetModpacksAsync();
                 _matcher.Load(modpacks);
             }
-            catch { /* offline or backend down — matcher just won't tag anything */ }
+            catch { /* backend down — matcher just won't tag anything */ }
 
-            // 1) BYES pinned servers first
+            // 1) BYES curated servers (pinned at top via the IsByes sort).
+            // The /api/servers/byes endpoint enriches with cached gamedig
+            // stats server-side; no A2S round-trip from the launcher needed.
             try
             {
+                Status = "Loading BYES servers...";
                 var byes = await _backend.GetByesServersAsync();
                 foreach (var e in byes)
                 {
-                    var ep = new ServerEndpoint(IPAddress.Parse(e.Ip), (ushort)e.Port);
-                    var info = await _a2s.QueryAsync(ep) ?? new ServerInfo
+                    if (!IPAddress.TryParse(e.Ip, out var ip)) continue;
+                    // Honor admin-set query_port from /admin servers form. If
+                    // the value matches gamePort+1 (the convention) or wasn't
+                    // sent, leave ExplicitQueryPort null so ServerEndpoint
+                    // computes the default.
+                    ushort? qp = (e.QueryPort > 0 && e.QueryPort != e.Port + 1) ? (ushort)e.QueryPort : null;
+                    var ep = new ServerEndpoint(ip, (ushort)e.Port, qp);
+                    var modpackIds = e.ResolveModpackIds();
+                    var info = new ServerInfo
                     {
-                        Endpoint = ep, Name = e.Name + "  (offline)", Players = 0, MaxPlayers = 0,
+                        Endpoint = ep,
+                        Name = e.Live?.Online == true ? e.Name : e.Name + "  (offline)",
+                        Map = e.Live?.Map ?? "",
+                        Gametype = ByesLauncher.Services.GameTypeDetector.Detect(
+                            e.Name,
+                            fallback: modpackIds.FirstOrDefault() ?? ""),
+                        Players = e.Live?.Players ?? 0,
+                        MaxPlayers = e.Live?.MaxPlayers ?? 0,
+                        Ping = e.Live?.Ping ?? 0,
+                        IsByes = true,
+                        ModpackIds = modpackIds,
                     };
-                    info.IsByes = true;
-                    info.ModpackId = e.ModpackId;
-                    if (!info.Name.EndsWith("(offline)")) info.Name = e.Name;
                     info.IsFavorite = _favorites.IsFavorite(info.Endpoint);
                     Servers.Add(info);
                 }
             }
             catch (Exception ex)
             {
-                Status = "Backend offline: " + ex.Message + " — continuing with public servers.";
+                Status = "BYES list unavailable: " + ex.Message + " — continuing with public servers.";
             }
 
-            // 2) Public master server discovery
-            Status = "Querying Steam master server...";
-            var endpoints = await _master.QueryAsync();
-            Status = $"Querying {endpoints.Count} servers...";
-
-            int tally = 0;
-            await _a2s.QueryManyAsync(endpoints, parallelism: 96, onResult: info =>
+            // 2) Public-server discovery via the backend's /api/servers/discover.
+            // Replaces direct Steam-master-server UDP (Valve retired the public
+            // hostname). Backend cascades Steam Web API → BattleMetrics with a
+            // 60s fresh / 5min stale-while-revalidate cache.
+            try
             {
-                info.IsFavorite = _favorites.IsFavorite(info.Endpoint);
-                // Auto-link to a modpack if the server's metadata matches admin-defined
-                // patterns. Lets "any public Epoch server" auto-sync our Epoch pack.
-                if (string.IsNullOrEmpty(info.ModpackId))
-                    info.ModpackId = _matcher.MatchFor(info);
-                Application.Current.Dispatcher.Invoke(() => Servers.Add(info));
-                Interlocked.Increment(ref tally);
-            });
+                Status = "Discovering public servers...";
+                var result = await _backend.GetDiscoveredServersAsync("arma2oa");
+                foreach (var info in result.Servers)
+                {
+                    info.IsFavorite = _favorites.IsFavorite(info.Endpoint);
+                    // Public servers tag with at most one inferred modpack via
+                    // admin-defined regex patterns — the matcher is single-shot
+                    // and the first regex match wins.
+                    if (info.ModpackIds.Count == 0)
+                    {
+                        var matched = _matcher.MatchFor(info);
+                        if (!string.IsNullOrEmpty(matched))
+                            info.ModpackIds = new List<string> { matched };
+                    }
+                    Servers.Add(info);
+                }
+                var src = string.IsNullOrEmpty(result.SourceDisplay) ? "" : $" · {result.SourceDisplay}";
+                Status = $"{Servers.Count} servers loaded ({Servers.Count(s => s.IsByes)} BYES + {Servers.Count(s => !s.IsByes)} public){src}. Measuring pings…";
+                RebuildFilterDropdowns();
 
-            Status = $"{Servers.Count} servers loaded ({Servers.Count(s => s.IsByes)} BYES + {Servers.Count(s => !s.IsByes)} public).";
-            RebuildFilterDropdowns();
+                // Steam Web API doesn't measure latency. Fire off A2S probes
+                // in the background and stream real ping values into the grid
+                // as they arrive (ServerInfo is observable so the column
+                // refreshes in place). Discovered servers only — BYES rows
+                // already have ping from gamedig server-side.
+                _ = EnrichPingsAsync(Servers.Where(s => !s.IsByes).ToList());
+            }
+            catch (Exception ex)
+            {
+                // BYES list still showed if it succeeded; just flag that public
+                // discovery is down and let the user retry.
+                Status = $"Public server discovery offline: {ex.Message}";
+            }
         }
         catch (Exception ex) { Status = "Error: " + ex.Message; }
-        finally { IsLoading = false; }
+        finally
+        {
+            // Track timestamp regardless of success — failed refreshes still
+            // count for the stale-check (we don't want to retry a failing
+            // backend every 30s on every tab click).
+            LastRefreshUtc = DateTime.UtcNow;
+            IsLoading = false;
+        }
+    }
+
+    /// Tab-activate hook: refresh only if the data is older than `staleness`
+    /// AND we're not already loading. This is what MainWindow calls when
+    /// the user switches into the Servers tab — keeps tab-flipping cheap
+    /// while still giving fresh data after the user has been away.
+    public async Task RefreshIfStaleAsync(TimeSpan staleness)
+    {
+        if (IsLoading) return;
+        if (DateTime.UtcNow - LastRefreshUtc < staleness) return;
+        await RefreshAsync();
     }
 
     [RelayCommand]

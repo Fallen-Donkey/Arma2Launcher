@@ -32,6 +32,37 @@ public class DownloadService
         _httpFactory = httpFactory;
     }
 
+    /// Cheap pre-check: every manifest file already exists locally at the
+    /// expected size. Doesn't hash — trusts size as a "good enough" proxy so
+    /// a fully-installed modpack skips the verify dialog entirely (no
+    /// progress bar flash on every Join). If anything's off, the caller
+    /// falls through to the full hash-verified `SyncModpackAsync` and
+    /// downloads only the changed files. The trade-off: a corrupted .pbo
+    /// with the right size won't be re-downloaded automatically — that's
+    /// recoverable by clicking "Refresh" on the modpack tab to force a
+    /// full re-sync, and the launcher would error out at game launch
+    /// regardless.
+    public bool AllFilesLikelyPresent(Manifest manifest)
+    {
+        var armaRoot = _config.Config.Arma2OaPath;
+        if (string.IsNullOrWhiteSpace(armaRoot) || !Directory.Exists(armaRoot)) return false;
+
+        foreach (var file in manifest.Files)
+        {
+            var targetPath = Path.Combine(armaRoot, file.Path);
+            if (!File.Exists(targetPath)) return false;
+            if (file.Size > 0)
+            {
+                try
+                {
+                    if (new FileInfo(targetPath).Length != file.Size) return false;
+                }
+                catch { return false; }
+            }
+        }
+        return true;
+    }
+
     /// Sync every file in `manifest` into the Arma 2 OA root.
     /// `onFailure` (optional) is invoked when a single file errors — it returns
     /// Retry / Skip / Abort so the caller (download dialog) can ask the user.

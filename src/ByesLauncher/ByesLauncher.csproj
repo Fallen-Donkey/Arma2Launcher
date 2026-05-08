@@ -8,7 +8,8 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>ByesLauncher</RootNamespace>
     <AssemblyName>ByesLauncher</AssemblyName>
-    <Version>0.1.0</Version>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>0.1.18</Version>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

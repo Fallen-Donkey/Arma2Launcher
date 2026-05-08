@@ -18,12 +18,18 @@ dist/
 ## Private deployment handoff docs — operational details that don't belong in the public repo
 WEBSITE_HANDOFF.md
 LAUNCHER_DEPLOY_HANDOFF.md
+LAUNCHER_DISCOVERY_HANDOFF.md
+LAUNCHER_PORT_DISCOVERY_HANDOFF.md
+LAUNCHER_SESSION_HANDOFF.md
 OSS_HANDOFF.md
+
+## Private research — decompiled third-party binaries belong on local disk only
+research/
 
 ## Local screenshots (kept for development, not for the public repo)
 preview*.png
 
-## Local Velopack signing config (real one is provided by SignPath, never committed)
+## Local code signing config — credentials/secrets never committed
 signing.config.json
 
 ## Secrets — extra paranoia, none should live in repo anyway
@@ -36,3 +42,6 @@ signing.config.json
 ## OS
 Thumbs.db
 .DS_Store
+
+## Claude Code working directory — local session state, hooks, transcripts
+.claude/

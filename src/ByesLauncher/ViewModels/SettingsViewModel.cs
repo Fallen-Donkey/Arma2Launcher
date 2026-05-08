@@ -25,6 +25,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool filePatching;
     [ObservableProperty] private bool enableHT;
     [ObservableProperty] private bool windowed;
+    [ObservableProperty] private bool useSteamLaunch;
+    [ObservableProperty] private bool noD3D9Ex;
 
     // Performance
     [ObservableProperty] private string maxMem;
@@ -57,6 +59,8 @@ public partial class SettingsViewModel : ObservableObject
         filePatching = c.FilePatching;
         enableHT = c.EnableHT;
         windowed = c.Windowed;
+        useSteamLaunch = c.UseSteamLaunch;
+        noD3D9Ex = c.NoD3D9Ex;
         maxMem = c.MaxMem?.ToString() ?? "";
         cpuCount = c.CpuCount?.ToString() ?? "";
         exThreads = c.ExThreads?.ToString() ?? "";
@@ -105,6 +109,8 @@ public partial class SettingsViewModel : ObservableObject
         c.FilePatching = FilePatching;
         c.EnableHT = EnableHT;
         c.Windowed = Windowed;
+        c.UseSteamLaunch = UseSteamLaunch;
+        c.NoD3D9Ex = NoD3D9Ex;
         c.MaxMem = int.TryParse(MaxMem, out var mm) ? mm : null;
         c.CpuCount = int.TryParse(CpuCount, out var cc) ? cc : null;
         c.ExThreads = int.TryParse(ExThreads, out var et) ? et : null;
@@ -120,6 +126,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         NoSplash = true; SkipIntro = true; WorldEmpty = true; NoPause = false;
         ShowScriptErrors = false; FilePatching = false; EnableHT = true; Windowed = false;
+        NoD3D9Ex = true;
         MaxMem = ""; CpuCount = ""; ExThreads = ""; Malloc = "system"; CustomArgs = "";
     }
 }

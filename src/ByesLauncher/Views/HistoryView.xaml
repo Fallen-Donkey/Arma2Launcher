@@ -6,36 +6,151 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <ui:Button Content="Refresh" Command="{Binding RefreshCommand}" Icon="{ui:SymbolIcon ArrowSync24}"/>
-            <ui:Button Content="Clear all" Command="{Binding ClearCommand}" Appearance="Danger"
-                       Icon="{ui:SymbolIcon Delete24}" Margin="8,0,0,0"/>
-            <TextBlock Text="Last 25 servers you joined. Click rejoin to sync mods + connect again."
-                       Opacity="0.7" VerticalAlignment="Center" Margin="16,0,0,0"/>
-        </StackPanel>
+        <!-- Top toolbar: refresh + search + clear-bulk dropdown. The clear
+             dropdown holds Clear all + age-based bulk options so we don't
+             stack four near-identical buttons across the toolbar. -->
+        <Border Grid.Row="0" Padding="8" Margin="0,0,0,8"
+                Background="#1F1F1F" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="4">
+            <DockPanel LastChildFill="True">
+                <ui:Button DockPanel.Dock="Left" Content="Refresh" Command="{Binding RefreshCommand}"
+                           Icon="{ui:SymbolIcon ArrowSync24}" Margin="0,0,8,0"/>
 
-        <DataGrid Grid.Row="1"
-                  ItemsSource="{Binding Entries}"
-                  SelectedItem="{Binding Selected}"
-                  AutoGenerateColumns="False" IsReadOnly="True"
-                  HeadersVisibility="Column" GridLinesVisibility="None"
-                  RowBackground="Transparent" AlternatingRowBackground="#181818"
-                  Background="#141414" BorderBrush="#3A3A3A">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Server Name" Binding="{Binding Name}"      Width="*"/>
-                <DataGridTextColumn Header="Map"         Binding="{Binding Map}"       Width="120"/>
-                <DataGridTextColumn Header="Modpack"     Binding="{Binding ModpackId}" Width="160"/>
-                <DataGridTextColumn Header="IP:Port"     Binding="{Binding Endpoint}"  Width="160"/>
-                <DataGridTextColumn Header="Joined"      Binding="{Binding JoinedAt}"  Width="160"/>
-            </DataGrid.Columns>
-        </DataGrid>
+                <!-- Bulk-clear dropdown. Using a Menu inside a styled Button so
+                     it behaves like a real split-action button. -->
+                <Menu DockPanel.Dock="Right" Background="Transparent" Margin="8,0,0,0">
+                    <MenuItem Header="Clear..." Padding="10,4">
+                        <MenuItem Header="Older than 7 days"
+                                  Command="{Binding ClearOlderThanCommand}" CommandParameter="7"/>
+                        <MenuItem Header="Older than 30 days"
+                                  Command="{Binding ClearOlderThanCommand}" CommandParameter="30"/>
+                        <MenuItem Header="Older than 90 days"
+                                  Command="{Binding ClearOlderThanCommand}" CommandParameter="90"/>
+                        <Separator/>
+                        <MenuItem Header="Clear all" Command="{Binding ClearAllCommand}"/>
+                    </MenuItem>
+                </Menu>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
-            <ui:Button Content="Rejoin" Appearance="Primary" Command="{Binding RejoinCommand}"
-                       Icon="{ui:SymbolIcon Play24}"/>
-        </StackPanel>
+                <ui:TextBox PlaceholderText="Search history by name, map, modpack, or IP..."
+                            Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}"
+                            Icon="{ui:SymbolIcon Search24}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Two-column main: list | details. Mirrors Servers/Favorites for
+             muscle-memory consistency. -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="6"/>
+                <ColumnDefinition Width="320"/>
+            </Grid.ColumnDefinitions>
+
+            <DataGrid Grid.Column="0"
+                      ItemsSource="{Binding EntriesView}"
+                      SelectedItem="{Binding Selected}"
+                      AutoGenerateColumns="False" IsReadOnly="True"
+                      HeadersVisibility="Column" GridLinesVisibility="None"
+                      RowBackground="Transparent" AlternatingRowBackground="#181818"
+                      Background="#141414" BorderBrush="#3A3A3A"
+                      MouseDoubleClick="OnRowDoubleClick">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#1F4A6E"/>
+                                <Setter Property="BorderBrush" Value="#4CC2FF"/>
+                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Rejoin server" Command="{Binding RejoinCommand}"/>
+                        <MenuItem Header="Remove from history" Command="{Binding RemoveSelectedCommand}"/>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Server Name" Binding="{Binding Name}"      Width="*"/>
+                    <DataGridTextColumn Header="Map"         Binding="{Binding Map}"       Width="120"/>
+                    <DataGridTextColumn Header="Modpacks"    Binding="{Binding ModpackIds, Converter={StaticResource JoinListConverter}}" Width="160"/>
+                    <DataGridTextColumn Header="IP:Port"     Binding="{Binding Endpoint}"  Width="160"/>
+                    <DataGridTextColumn Header="Joined"      Binding="{Binding JoinedAt}"  Width="160"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"/>
+
+            <!-- Right: details panel. HistoryEntry has a smaller field set
+                 than ServerInfo (no live ping/players — that's the point of
+                 history, it's a snapshot at join time), so the layout is
+                 lighter. -->
+            <Border Grid.Column="2" Background="#1A1A1A" BorderBrush="#3A3A3A"
+                    BorderThickness="1" CornerRadius="4" Padding="14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Visibility="{Binding Selected, Converter={StaticResource NullToCollapsedConverter}}">
+                        <TextBlock Text="{Binding Selected.Name}" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Selected.Endpoint}" Opacity="0.6" Margin="0,2,0,12"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Map"      Opacity="0.6" Margin="0,2"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Selected.Map}" Margin="12,2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Modpacks" Opacity="0.6" Margin="0,2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Selected.ModpackIds, Converter={StaticResource JoinListConverter}}" Foreground="#4CC2FF" Margin="12,2" TextWrapping="Wrap"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Joined"   Opacity="0.6" Margin="0,2"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Selected.JoinedAt}" Margin="12,2"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="0" Grid.RowSpan="2"
+                               Text="Select an entry to see details."
+                               Opacity="0.5" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="{Binding Selected, Converter={StaticResource NullToVisibleConverter}}"/>
+
+                    <StackPanel Grid.Row="2" Orientation="Vertical">
+                        <ui:Button Appearance="Primary"
+                                   Content="{Binding IsJoining, Converter={StaticResource JoinButtonContentConverter}, ConverterParameter=REJOIN}"
+                                   Command="{Binding RejoinCommand}" HorizontalAlignment="Stretch"
+                                   Icon="{ui:SymbolIcon Play24}"
+                                   Height="44" FontSize="14" FontWeight="Bold">
+                            <ui:Button.Style>
+                                <Style TargetType="{x:Type ui:Button}" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                    <Setter Property="IsEnabled" Value="True"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsJoining}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Selected}" Value="{x:Null}">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                        <ui:Button Content="Remove from history" Command="{Binding RemoveSelectedCommand}"
+                                   Icon="{ui:SymbolIcon Delete24}" HorizontalAlignment="Stretch"
+                                   Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

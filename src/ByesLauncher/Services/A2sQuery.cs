@@ -117,7 +117,9 @@ public class A2sQuery
             await sem.WaitAsync(ct);
             try
             {
-                var info = await QueryAsync(ep, 1500, ct);
+                // 2.5s — DayZ servers under heavy player load can be slow to
+                // respond to A2S. Lower than this drops too many real servers.
+                var info = await QueryAsync(ep, 2500, ct);
                 if (info != null)
                 {
                     lock (lockObj) results.Add(info);
@@ -151,19 +153,55 @@ public class A2sQuery
         byte visibility = buf[i++];
         byte vac = buf[i++];
         string version = i < buf.Length ? ReadCString(buf, ref i) : "";
-        _ = vac; _ = folder; _ = game;
+
+        // Extra Data Flag — optional fields after Version. Parse out the
+        // Keywords (tags) string when present; that's where Arma 2 servers
+        // expose their build number (`n144629`), BattlEye filter (`bt`/`bf`),
+        // signature flags (`vt`), and other identity bits we use to match
+        // servers to modpacks. Layout per the Source A2S spec:
+        //   if (edf & 0x80) i += 2;        // game port
+        //   if (edf & 0x10) i += 8;        // steam id
+        //   if (edf & 0x40) i += 2 + cstr; // spectator port + name
+        //   if (edf & 0x20) keywords = cstr;
+        //   if (edf & 0x01) i += 8;        // game id
+        // We're only after keywords; everything else gets skipped via the
+        // appropriate offset. Bail safely if the buffer runs short.
+        string keywords = "";
+        if (i < buf.Length)
+        {
+            byte edf = buf[i++];
+            if ((edf & 0x80) != 0) { if (i + 2 > buf.Length) goto done; i += 2; }
+            if ((edf & 0x10) != 0) { if (i + 8 > buf.Length) goto done; i += 8; }
+            if ((edf & 0x40) != 0)
+            {
+                if (i + 2 > buf.Length) goto done;
+                i += 2;
+                _ = ReadCString(buf, ref i);
+            }
+            if ((edf & 0x20) != 0 && i < buf.Length)
+                keywords = ReadCString(buf, ref i);
+            // Game ID we don't need; deliberately not parsed.
+        }
+        done:
+        _ = vac; _ = folder;
 
         return new ServerInfo
         {
             Endpoint = ep,
             Name = name,
             Map = map,
+            // The "game" CString is usually the BI mod description ("DayZ Epoch",
+            // "ArmA 2: Operation Arrowhead"). Keywords carries the version-stamp
+            // tags. We surface both: Gametype for human display, Keywords for
+            // matching infrastructure.
             Gametype = game,
+            Keywords = keywords,
             Version = version,
             Players = players,
             MaxPlayers = maxPlayers,
             PasswordProtected = visibility == 1,
-            BattleEye = name.Contains("BE", StringComparison.OrdinalIgnoreCase),
+            BattleEye = name.Contains("BE", StringComparison.OrdinalIgnoreCase)
+                     || keywords.Contains("bt", StringComparison.OrdinalIgnoreCase),
         };
     }
 

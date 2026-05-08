@@ -75,18 +75,15 @@
             </DockPanel>
         </Border>
 
-        <TabControl Grid.Row="2" Margin="12,12,12,0">
-            <TabItem Header="Arma 2 Servers">
+        <TabControl Grid.Row="2" Margin="12,12,12,0" SelectionChanged="OnTabChanged" x:Name="MainTabs">
+            <TabItem Header="Arma 2 Servers" x:Name="ServersTab">
                 <v:ServersView DataContext="{Binding Servers}"/>
             </TabItem>
-            <TabItem Header="Favorites">
+            <TabItem Header="Favorites" x:Name="FavoritesTab">
                 <v:FavoritesView DataContext="{Binding Favorites}"/>
             </TabItem>
-            <TabItem Header="History">
+            <TabItem Header="History" x:Name="HistoryTab">
                 <v:HistoryView DataContext="{Binding History}"/>
-            </TabItem>
-            <TabItem Header="DayZ Standalone">
-                <v:DayZStandaloneView DataContext="{Binding Dayz}"/>
             </TabItem>
             <TabItem Header="Modpacks">
                 <v:ModpacksView DataContext="{Binding Modpacks}"/>
@@ -104,6 +101,10 @@
             <StatusBarItem><TextBlock Text="{Binding StatusText}"/></StatusBarItem>
             <Separator/>
             <StatusBarItem><TextBlock Text="byes.nz" Opacity="0.7"/></StatusBarItem>
+            <Separator/>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{Binding VersionLabel}" Opacity="0.6" FontFamily="Consolas"/>
+            </StatusBarItem>
         </StatusBar>
     </Grid>
 </ui:FluentWindow>

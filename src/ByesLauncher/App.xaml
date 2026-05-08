@@ -15,6 +15,10 @@
             <local:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
             <local:NullToVisibleConverter x:Key="NullToVisibleConverter"/>
             <local:NotNullConverter x:Key="NotNullConverter"/>
+            <local:ZeroToVisibleConverter x:Key="ZeroToVisibleConverter"/>
+            <local:JoinListConverter x:Key="JoinListConverter"/>
+            <local:InverseBoolConverter x:Key="InverseBoolConverter"/>
+            <local:JoinButtonContentConverter x:Key="JoinButtonContentConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -23,7 +23,7 @@ public class HistoryService
             Endpoint = key,
             Name = server.Name,
             Map = server.Map,
-            ModpackId = server.ModpackId,
+            ModpackIds = new List<string>(server.ModpackIds),  // copy so later VM mutations don't bleed back
             JoinedAt = DateTime.UtcNow,
         });
         if (list.Count > MaxEntries) list.RemoveRange(MaxEntries, list.Count - MaxEntries);
@@ -34,5 +34,27 @@ public class HistoryService
     {
         _config.Config.History.Clear();
         _config.Save();
+    }
+
+    /// Remove a single history entry by its endpoint string. No-op if not
+    /// present (idempotent — caller doesn't have to check first).
+    public void Remove(string endpoint)
+    {
+        var removed = _config.Config.History.RemoveAll(h =>
+            string.Equals(h.Endpoint, endpoint, StringComparison.OrdinalIgnoreCase));
+        if (removed > 0) _config.Save();
+    }
+
+    /// Drop history entries older than `days` (uses JoinedAt). Returns the
+    /// number removed so the UI can flash a "removed N entries" toast. Days
+    /// must be ≥ 1 — anything less is treated as "do nothing" rather than
+    /// silently nuking the whole list.
+    public int ClearOlderThan(int days)
+    {
+        if (days < 1) return 0;
+        var cutoff = DateTime.UtcNow.AddDays(-days);
+        var removed = _config.Config.History.RemoveAll(h => h.JoinedAt < cutoff);
+        if (removed > 0) _config.Save();
+        return removed;
     }
 }

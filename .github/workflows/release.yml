@@ -3,9 +3,9 @@ name: Release
 # Triggers on a pushed tag matching `v*` (e.g. `v0.1.1`). Builds the launcher,
 # packs a Velopack release, and attaches the artifacts to a GitHub Release.
 #
-# Once SignPath OSS approval lands, the signing step (currently commented out)
-# gets enabled and every artifact is signed before upload — eliminating the
-# SmartScreen warning for end users.
+# Code signing is not currently wired up — see CHANGELOG.md and README.md for
+# context. When a signing path is selected (likely SSL.com OV with eSigner cloud
+# HSM), the `--signTemplate` parameter on `vpk pack` is the integration point.
 
 on:
   push:
@@ -44,20 +44,10 @@ jobs:
         run: dotnet publish src/ByesLauncher/ByesLauncher.csproj -c Release -r win-x64 --self-contained -o dist/publish
 
       # ---------------------------------------------------------------
-      # SignPath signing — uncomment AFTER SignPath OSS approval lands.
-      # Set SIGNPATH_API_TOKEN as a repo secret first.
+      # Code signing integration point — when a signing path is selected,
+      # add a `--signTemplate '<sign command> {{file}}'` parameter to the
+      # `vpk pack` step below. Velopack runs the template per artifact.
       # ---------------------------------------------------------------
-      # - name: Submit to SignPath for signing
-      #   uses: signpath/github-action-submit-signing-request@v1
-      #   with:
-      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-      #     organization-id: ${{ vars.SIGNPATH_ORG_ID }}
-      #     project-slug: byes-launcher
-      #     signing-policy-slug: release-signing
-      #     artifact-configuration-slug: byes-launcher
-      #     github-artifact-name: byes-launcher-publish
-      #     wait-for-completion: true
-      #     output-artifact-directory: dist/publish
 
       - name: Pack Velopack release
         run: |
@@ -68,7 +58,8 @@ jobs:
             -e ByesLauncher.exe `
             -o dist/releases `
             --packTitle "Backyard Esports Launcher" `
-            --packAuthors "Backyard Esports"
+            --packAuthors "Backyard Esports" `
+            --icon src/ByesLauncher/Assets/app.ico
 
       - name: Create GitHub Release with artifacts
         uses: softprops/action-gh-release@v2

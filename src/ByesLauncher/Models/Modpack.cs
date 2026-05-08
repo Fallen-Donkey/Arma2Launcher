@@ -36,9 +36,43 @@ public class ByesServerEntry
     public required string Name { get; set; }
     public required string Ip { get; set; }
     public required int Port { get; set; }
-    public string? ModpackId { get; set; }
+    /// Authoritative query port from the website's `game_servers.query_port`
+    /// admin-set field (in the wire since the multi-modpack work). When 0
+    /// or missing, fall back to gamePort+1 via ServerEndpoint's default.
+    [System.Text.Json.Serialization.JsonPropertyName("queryPort")]
+    public int QueryPort { get; set; }
     public string? Description { get; set; }
     public LiveStats? Live { get; set; }
+
+    /// New shape (post-multi-modpack rollout, breaking-contract change).
+    /// Server may require N modpacks loaded in `LoadOrder` ascending order.
+    /// Empty array = no modpack requirement.
+    [System.Text.Json.Serialization.JsonPropertyName("modpacks")]
+    public List<ModpackRef> Modpacks { get; set; } = new();
+
+    /// Legacy single-modpack shape. Kept only so v0.1.2 launchers that hit
+    /// a backend still serving the old shape don't lose modpack info during
+    /// the transition window. Drop in v0.1.3 once the website rollout is
+    /// confirmed and old clients are gone.
+    [System.Text.Json.Serialization.JsonPropertyName("modpackId")]
+    public string? LegacyModpackId { get; set; }
+
+    /// Materialize the modpack id list from whichever shape the backend
+    /// served, sorted by load order. Empty list → no modpack required.
+    public List<string> ResolveModpackIds()
+    {
+        if (Modpacks.Count > 0)
+            return Modpacks.OrderBy(m => m.LoadOrder).Select(m => m.Id).ToList();
+        return string.IsNullOrEmpty(LegacyModpackId) ? new() : new() { LegacyModpackId };
+    }
+}
+
+public class ModpackRef
+{
+    [System.Text.Json.Serialization.JsonPropertyName("id")]
+    public required string Id { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("loadOrder")]
+    public int LoadOrder { get; set; }
 }
 
 public class LiveStats

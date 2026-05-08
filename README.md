@@ -85,23 +85,32 @@ vpk pack -u ByesLauncher -v 0.1.0 -p dist/publish -e ByesLauncher.exe -o dist/re
 PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Areas where contributions
 would be especially appreciated:
 
-- Code signing via SignPath.io (currently in approval; once live, the
-  SmartScreen warning disappears for end users).
 - DayZ Standalone Steam Workshop integration (currently the SA tab just
   steam-protocol-launches; full Workshop subscription management is open).
 - Discord rich presence ("Playing on BYES Epoch").
 - Crash telemetry hookup (Sentry or a simple `/api/crash` POST).
 - Localization beyond English.
 
+## Code signing
+
+The launcher is currently **unsigned**, which means Windows SmartScreen
+shows the "Windows protected your PC" dialog on first install. Click
+**More info** → **Run anyway** to install. The warning goes away after
+Windows builds a reputation for the binary.
+
+A small minority of Win11 users on Smart App Control may see a stricter
+block. See [byes.nz/launcher](https://byes.nz/launcher) for the workaround
+documentation.
+
+Code signing is on the roadmap once the project's user base grows enough
+to justify the recurring cost of an EV/OV certificate. Geographic
+restrictions on Microsoft's cheap Trusted Signing service (US/CA/EU/UK
+only — we're Australia-based) ruled out the obvious budget option.
+
 ## Why is the source open?
 
-Two reasons:
-
-1. **Trust.** A launcher with write access to your game folder should be
-   auditable. You can read every line and verify it does what it says.
-2. **Free code-signing via SignPath.io's OSS program.** Signed binaries
-   eliminate the SmartScreen "Windows protected your PC" warning that
-   unsigned community apps trigger.
+A launcher with write access to your game folder should be auditable. You
+can read every line and verify it does what it says before installing.
 
 ## License
 

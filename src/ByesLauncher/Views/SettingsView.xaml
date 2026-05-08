@@ -33,24 +33,45 @@
                 <ui:CardExpander.Header>
                     <TextBlock Text="Launch options" FontWeight="SemiBold" FontSize="14"/>
                 </ui:CardExpander.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                        <CheckBox Content="Use BattlEye (arma2oa_be.exe)" IsChecked="{Binding UseBattleEye}" Margin="0,4"/>
-                        <CheckBox Content="-nosplash    Skip the BI splash videos" IsChecked="{Binding NoSplash}" Margin="0,4"/>
-                        <CheckBox Content="-skipIntro    Skip the main-menu intro" IsChecked="{Binding SkipIntro}" Margin="0,4"/>
-                        <CheckBox Content="-world=empty  Don't preload Chernarus on menu" IsChecked="{Binding WorldEmpty}" Margin="0,4"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                        <CheckBox Content="-noPause      Keep simulation running when alt-tabbed" IsChecked="{Binding NoPause}" Margin="0,4"/>
-                        <CheckBox Content="-showScriptErrors" IsChecked="{Binding ShowScriptErrors}" Margin="0,4"/>
-                        <CheckBox Content="-filePatching (allow loose unpacked files)" IsChecked="{Binding FilePatching}" Margin="0,4"/>
-                        <CheckBox Content="-window       Run windowed instead of fullscreen" IsChecked="{Binding Windowed}" Margin="0,4"/>
-                    </StackPanel>
-                </Grid>
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                            <CheckBox Content="Use BattlEye (arma2oa_be.exe)" IsChecked="{Binding UseBattleEye}" Margin="0,4"/>
+                            <CheckBox Content="-nosplash    Skip the BI splash videos" IsChecked="{Binding NoSplash}" Margin="0,4"/>
+                            <CheckBox Content="-skipIntro    Skip the main-menu intro" IsChecked="{Binding SkipIntro}" Margin="0,4"/>
+                            <CheckBox Content="-world=empty  Don't preload Chernarus on menu" IsChecked="{Binding WorldEmpty}" Margin="0,4"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <CheckBox Content="-noPause      Keep simulation running when alt-tabbed" IsChecked="{Binding NoPause}" Margin="0,4"/>
+                            <CheckBox Content="-showScriptErrors" IsChecked="{Binding ShowScriptErrors}" Margin="0,4"/>
+                            <CheckBox Content="-filePatching (allow loose unpacked files)" IsChecked="{Binding FilePatching}" Margin="0,4"/>
+                            <CheckBox Content="-window       Run windowed instead of fullscreen" IsChecked="{Binding Windowed}" Margin="0,4"/>
+                            <CheckBox Content="-nod3d9ex     Required on Windows 11 24H2 (fixes crash on death/disconnect)"
+                                      IsChecked="{Binding NoD3D9Ex}" Margin="0,4"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Margin="0,12,0,0" Padding="10" CornerRadius="4"
+                            BorderBrush="#3A3A3A" BorderThickness="1" Background="#1A1A1A">
+                        <StackPanel>
+                            <CheckBox Content="Launch via Steam protocol (experimental)"
+                                      IsChecked="{Binding UseSteamLaunch}"/>
+                            <TextBlock Margin="22,2,0,0" FontSize="11" Opacity="0.7" TextWrapping="Wrap">
+                                Routes Join through <Run FontFamily="Consolas">steam://run/33930</Run> instead of starting
+                                arma2oa_be.exe directly. Eliminates the per-launch UAC prompt because Steam
+                                supplies its own elevation context. Caveat: relies on your Steam launch-options
+                                default for Arma 2 OA being the BattlEye-enabled choice — if you've changed
+                                that to the non-BE option in Steam, BattlEye-protected servers will reject the
+                                connection. Untested across enough installs to default-on yet; turn it on if
+                                the UAC prompts are bothering you and report back.
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </ui:CardExpander>
 
             <!-- Performance -->

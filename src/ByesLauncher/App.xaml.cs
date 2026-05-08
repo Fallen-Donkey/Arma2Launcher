@@ -28,7 +28,6 @@ public partial class App : Application
 
         services.AddSingleton<ConfigService>();
         services.AddSingleton<BackendClient>();
-        services.AddSingleton<SteamMasterQuery>();
         services.AddSingleton<A2sQuery>();
         services.AddSingleton<DownloadService>();
         services.AddSingleton<ProfileService>();
@@ -38,13 +37,13 @@ public partial class App : Application
         services.AddSingleton<HistoryService>();
         services.AddSingleton<FavoritesService>();
         services.AddSingleton<ModpackMatcher>();
+        services.AddSingleton<WindowsCompatService>();
         services.AddSingleton<ViewModels.ModpackJoinCoordinator>();
 
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ServersViewModel>();
         services.AddSingleton<FavoritesViewModel>();
         services.AddSingleton<HistoryViewModel>();
-        services.AddSingleton<DayZStandaloneViewModel>();
         services.AddSingleton<ModpacksViewModel>();
         services.AddSingleton<ProfilesViewModel>();
         services.AddSingleton<SettingsViewModel>();
