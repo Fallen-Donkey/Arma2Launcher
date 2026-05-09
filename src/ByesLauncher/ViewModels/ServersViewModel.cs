@@ -313,9 +313,27 @@ public partial class ServersViewModel : ObservableObject
     [RelayCommand]
     private async Task RefreshAsync()
     {
+        // Re-entrancy guard. RelayCommand doesn't auto-disable while running,
+        // and v0.1.18's tab-activate auto-refresh path can fire concurrently
+        // with the startup OnLoaded refresh — both Servers.Clear() before
+        // either's data arrives, then both Servers.Add() the same results,
+        // producing duplicates in the grid (v0.1.18 regression). Bail
+        // silently if a refresh is already in flight.
+        if (IsLoading) return;
+
         IsLoading = true;
         Status = "Loading...";
         Servers.Clear();
+
+        // Track endpoints added during this refresh so we don't list a server
+        // twice. Two real sources of duplication that this guards against:
+        //   1. A BYES server that's also publicly discoverable on Steam — the
+        //      BYES entry wins (loaded first, has IsByes=true and the proper
+        //      modpack mapping); the public-discovery duplicate is skipped.
+        //   2. Backend-side Steam Web API ↔ BattleMetrics overlap returning
+        //      the same server twice in one response.
+        var addedEndpoints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         try
         {
             // Load modpack catalog up-front so we can auto-tag public servers.
@@ -342,6 +360,10 @@ public partial class ServersViewModel : ObservableObject
                     // computes the default.
                     ushort? qp = (e.QueryPort > 0 && e.QueryPort != e.Port + 1) ? (ushort)e.QueryPort : null;
                     var ep = new ServerEndpoint(ip, (ushort)e.Port, qp);
+                    // Defensive dedup against backend repeats — admin shouldn't
+                    // register the same server twice but if they did we won't
+                    // show it twice.
+                    if (!addedEndpoints.Add(ep.ToString())) continue;
                     var modpackIds = e.ResolveModpackIds();
                     var info = new ServerInfo
                     {
@@ -376,6 +398,11 @@ public partial class ServersViewModel : ObservableObject
                 var result = await _backend.GetDiscoveredServersAsync("arma2oa");
                 foreach (var info in result.Servers)
                 {
+                    // Skip if a BYES entry (or a prior public entry from
+                    // Steam ↔ BattleMetrics overlap) already covered this
+                    // endpoint. BYES wins because it has IsByes=true and the
+                    // admin-curated modpack mapping.
+                    if (!addedEndpoints.Add(info.Endpoint.ToString())) continue;
                     info.IsFavorite = _favorites.IsFavorite(info.Endpoint);
                     // Public servers tag with at most one inferred modpack via
                     // admin-defined regex patterns — the matcher is single-shot

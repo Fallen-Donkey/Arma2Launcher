@@ -9,7 +9,7 @@
     <RootNamespace>ByesLauncher</RootNamespace>
     <AssemblyName>ByesLauncher</AssemblyName>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>0.1.18</Version>
+    <Version>0.1.19</Version>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

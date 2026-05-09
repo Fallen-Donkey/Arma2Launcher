@@ -10,6 +10,19 @@ indicates an internal/unshipped iteration.
 The launcher auto-updates via [Velopack](https://github.com/velopack/velopack);
 existing installs pick up new releases on next launch.
 
+## [0.1.19] — 2026-05-08
+
+### Fixed
+- **Duplicate servers in the list** — v0.1.18's tab-activate auto-refresh
+  could race with the startup refresh, both running concurrently and adding
+  every server twice. Added re-entrancy guard on `RefreshAsync`: if a refresh
+  is already running, additional invocations bail silently.
+- **Same server appearing as both BYES and public** — added endpoint-level
+  dedup across the BYES list and the public discovery list. BYES entries
+  win on collision (IsByes flag + admin-curated modpack mapping kept).
+  Also dedups against any backend-side Steam Web API ↔ BattleMetrics
+  overlap returning the same server twice in one response.
+
 ## [0.1.18] — 2026-05-08
 
 ### Added
